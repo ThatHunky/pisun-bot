@@ -4,7 +4,7 @@ from aiogram import Router, F
 from aiogram.filters import Command
 from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
 from src.database import Database
-from src.utils import get_fair_pisun_delta, PISUN_PHRASES, PIHV_VARIANTS, INSERT_RESPONSES
+from src.utils import get_fair_pisun_delta, PISUN_PHRASES, PIHV_VARIANTS, INSERT_RESPONSES, get_kyiv_now, get_kyiv_today
 import random
 
 router = Router()
@@ -21,14 +21,14 @@ async def cmd_pisun(message: Message):
     username = message.from_user.full_name
     
     user_data = await db.get_user(user_id, chat_id)
-    today = datetime.date.today()
+    today = get_kyiv_today()
     
     if user_data:
         length, count, last_measure, _ = user_data
         if last_measure == str(today):
             # Calculate time until midnight
-            now = datetime.datetime.now()
-            tomorrow = datetime.datetime.combine(today + datetime.timedelta(days=1), datetime.time.min)
+            now = get_kyiv_now()
+            tomorrow = datetime.datetime.combine(today + datetime.timedelta(days=1), datetime.time.min, tzinfo=now.tzinfo)
             remaining = tomorrow - now
             
             hours, remainder = divmod(int(remaining.total_seconds()), 3600)

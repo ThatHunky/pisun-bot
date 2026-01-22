@@ -1,4 +1,8 @@
 import random
+import datetime
+from zoneinfo import ZoneInfo
+
+KYIV_TZ = ZoneInfo("Europe/Kyiv")
 
 def get_fair_pisun_delta(measure_count: int, current_length: float) -> float:
     """
@@ -206,3 +210,10 @@ PISUN_PHRASES = {
         "Абонемент на сьогодні використано. 🎫",
     ]
 }
+def get_kyiv_now() -> datetime.datetime:
+    """Returns current time in Kyiv timezone."""
+    return datetime.datetime.now(KYIV_TZ)
+
+def get_kyiv_today() -> datetime.date:
+    """Returns current date in Kyiv timezone."""
+    return get_kyiv_now().date()
