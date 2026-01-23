@@ -66,6 +66,7 @@ async def main():
     await bot.set_my_commands([
         BotCommand(command="pisun", description="Поміряти пісюн (раз на день)"),
         BotCommand(command="top", description="Топ гігантів чату"),
+        BotCommand(command="top_week", description="Топ за тиждень"),
         BotCommand(command="start", description="Інформація про бота")
     ])
     

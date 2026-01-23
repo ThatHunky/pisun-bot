@@ -2,18 +2,39 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from src.database import Database
-from src.utils import PIHV_VARIANTS
+from src.utils import PIHV_VARIANTS, is_same_week, get_kyiv_today
 import datetime
 import random
 import logging
 
 logger = logging.getLogger(__name__)
 
-async def send_weekly_bonus(bot: Bot, db: Database, chat_ids: list):
+async def send_weekly_bonus(bot: Bot, db: Database, chat_ids: list, force: bool = False, update_global: bool = True):
     """
     Sends the ASCII art bonus message to all active chats.
+    If not forced, checks if it already happened this week.
     """
-    await db.set_event_state("weekly_pihv", datetime.date.today(), True)
+    today = get_kyiv_today()
+    if not force:
+        state = await db.get_event_state("weekly_pihv")
+        if state:
+            last_run_str, is_active, _ = state
+            if last_run_str:
+                try:
+                    if isinstance(last_run_str, str):
+                        last_run = datetime.date.fromisoformat(last_run_str)
+                    else:
+                        last_run = last_run_str
+                    
+                    if is_same_week(last_run, today):
+                        logger.info("Weekly bonus already sent this week. Skipping.")
+                        return
+                except Exception as e:
+                    logger.error(f"Error parsing last_run date: {e}")
+
+    # Mark global schedule as "done" for this week if requested
+    if update_global:
+        await db.set_event_state("weekly_pihv", today, False) 
     
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="Вставити! 👉👌", callback_data="insert_bonus")]
@@ -21,10 +42,10 @@ async def send_weekly_bonus(bot: Bot, db: Database, chat_ids: list):
     
     for chat_id in chat_ids:
         try:
-            # Pick a random variant for each send, or the same for all?
-            # Let's pick a random one for each chat for variety
-            ascii_art = random.choice(PIHV_VARIANTS)
+            # Activate the game for this specific chat
+            await db.set_chat_event_state(chat_id, "weekly_pihv", True)
             
+            ascii_art = random.choice(PIHV_VARIANTS)
             await bot.send_message(
                 chat_id,
                 f"🚨 **ЕКСТРЕНИЙ ВИПУСК!** 🚨\n\nЗ'явилася нічийна піхва! Будь першим, хто вставить!\n```\n{ascii_art}\n```",

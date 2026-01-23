@@ -8,28 +8,40 @@ def get_fair_pisun_delta(measure_count: int, current_length: float) -> float:
     """
     Returns a delta for the pisun measurement.
     - First 3 measurements are always positive (bonus for beginners)
-    - After that, can be positive or negative
-    - Never results in negative total length
+    - Early game (<50cm): Strong growth, lower penalty
+    - Mid game (50-150cm): Balanced growth
+    - End game (>150cm): High penalty, slower growth (diminishing returns)
     """
     if measure_count < 3:
         # First 3: always +1 to +10 cm
         return round(random.uniform(1.0, 10.0), 1)
     
-    # "Fair" random: chance for plus or minus
-    # We want it to seem fair, so +60% chance of plus, 40% chance of minus
-    chance = random.random()
-    if chance < 0.6:
-        delta = random.uniform(0.1, 7.0)
+    # Base configuration based on current length
+    if current_length < 50.0:
+        # Catch-up mode
+        plus_chance = 0.75
+        plus_range = (1.0, 8.0)
+        minus_range = (0.1, 3.0)
+    elif current_length < 150.0:
+        # Balanced mode
+        plus_chance = 0.60
+        plus_range = (0.1, 7.0)
+        minus_range = (0.1, 5.0)
     else:
-        delta = -random.uniform(0.1, 5.0)
+        # Hard mode (diminishing returns)
+        plus_chance = 0.45
+        plus_range = (0.0, 5.0)
+        minus_range = (0.5, 10.0)
+
+    chance = random.random()
+    if chance < plus_chance:
+        delta = random.uniform(*plus_range)
+    else:
+        delta = -random.uniform(*minus_range)
     
-    # Check if this results in negative length
+    # Ensure it doesn't go negative
     if current_length + delta < 0:
-        return -current_length  # Reset to 0 if it goes negative
-    
-    # Avoid -0.0 weirdness
-    if abs(delta) < 0.01:
-        delta = 0.0
+        delta = -current_length
         
     return round(delta, 1)
 
@@ -78,31 +90,44 @@ r"""
 ]
 
 INSERT_RESPONSES = [
-    "О ДАААА! Ти вставив це як батя! +15 см до твого шланга! 🍌",
-    "Це було волого... і результативно! +15 см отримано! 🔥",
-    "Швидка рука! Вставив першим - виграв життя! +15 см! 🚀",
-    "Залетіло як по маслу! +15 см твої! 💦",
-    "Снайперський постріл! Прямо в ціль! +15 см! 🎯",
-    "Твої рефлекси вражають! Піхва твоя! +15 см! ⚡️",
-    "Ого, ти навіть не постукав! Але результат є: +15 см! 🚪",
-    "Легендарне проникнення! Історичний момент! +15 см! 📜",
-    "Ти майстер своєї справи! Тримай заслужені +15 см! 🛠",
-    "Ідеальне виконання! Судді ставлять 10/10! +15 см! 🔟",
-    "Це було швидше за звук! Ти подолав бар'єр! +15 см! ✈️",
-    "Хірургічна точність! Пацієнт (піхва) задоволений! +15 см! 👨‍⚕️",
-    "Ти що, тренувався на пончиках? Ідеальне попадання! +15 см! 🍩",
-    "Агент 007 нервово палить збоку. Ти справжній профі! +15 см! 🕴️",
-    "Вставив і забув? Ні, вставив і виріс! +15 см! 🧠",
-    "Космічна стиковка пройшла успішно! Х'юстон, у нас +15 см! 🛰️",
-    "Ти розблокував досягнення 'Золотий Палець'! +15 см! 🏆",
-    "Навіть Ілон Маск не зміг би вставити краще! +15 см! 🚀",
-    "Це було так епічно, що Netflix хоче зняти про це серіал! +15 см! 🎬",
-    "Вставив як флешку з першого разу! Це магія! +15 см! 💾",
-    "Твій рівень тестостерону пробив стелю! +15 см! 🦍",
-    "Це не просто вставив, це мистецтво! +15 см! 🎨",
-    "Гросмейстерський хід! Шах і мат! +15 см! ♟️",
-    "Ти вкрав це очко як професійний злодій! +15 см! 🦝",
-    "Вставив з розвороту! Чак Норріс схвалює! +15 см! 🥋",
+    "О ДАААА! Ти вставив це як батя! +{delta} см до твого шланга! 🍌",
+    "Це було волого... і результативно! +{delta} см отримано! 🔥",
+    "Швидка рука! Вставив першим - виграв життя! +{delta} см! 🚀",
+    "Залетіло як по маслу! +{delta} см твої! 💦",
+    "Снайперський постріл! Прямо в ціль! +{delta} см! 🎯",
+    "Твої рефлекси вражають! Піхва твоя! +{delta} см! ⚡️",
+    "Ого, ти навіть не постукав! Але результат є: +{delta} см! 🚪",
+    "Легендарне проникнення! Історичний момент! +{delta} см! 📜",
+    "Ти майстер своєї справи! Тримай заслужені +{delta} см! 🛠",
+    "Ідеальне виконання! Судді ставлять 10/10! +{delta} см! 🔟",
+    "Це було швидше за звук! Ти подолав бар'єр! +{delta} см! ✈️",
+    "Хірургічна точність! Пацієнт (піхва) задоволений! +{delta} см! 👨‍⚕️",
+    "Ти що, тренувався на пончиках? Ідеальне попадання! +{delta} см! 🍩",
+    "Агент 007 нервово палить збоку. Ти справжній профі! +{delta} см! 🕴️",
+    "Вставив і забув? Ні, вставив і виріс! +{delta} см! 🧠",
+    "Космічна стиковка пройшла успішно! Х'юстон, у нас +{delta} см! 🛰️",
+    "Ти розблокував досягнення 'Золотий Палець'! +{delta} см! 🏆",
+    "Навіть Ілон Маск не зміг би вставити краще! +{delta} см! 🚀",
+    "Це було так епічно, що Netflix хоче зняти про це серіал! +{delta} см! 🎬",
+    "Вставив як флешку з першого разу! Це магія! +{delta} см! 💾",
+    "Твій рівень тестостерону пробив стелю! +{delta} см! 🦍",
+    "Це не просто вставив, це мистецтво! +{delta} см! 🎨",
+    "Гросмейстерський хід! Шах і мат! +{delta} см! ♟️",
+    "Ти вкрав це очко як професійний злодій! +{delta} см! 🦝",
+    "Вставив з розвороту! Чак Норріс схвалює! +{delta} см! 🥋",
+]
+
+TRAP_RESPONSES = [
+    "О ноу! Піхва відкусила... -{delta} см! 🦷",
+    "НІІІІ, ВІН ЗАСТРЯГ!! Довелося відрізати... -{delta} см! ✂️",
+    "Це була пастка! Ти потрапив у капкан: -{delta} см! 🪤",
+    "Вона виявилася затісною... Стиснуло до -{delta} см! 🤏",
+    "Там була піранья! Мінус {delta} см! 🐟",
+    "Ти вставив не туди... Штраф за неуважність: -{delta} см! 🚫",
+    "Вона була з шипами! Болюча втрата: -{delta} см! 🌵",
+    "Який жах! Вона холодна як лід! Зіщулився на -{delta} см! ❄️",
+    "Ти розбудив Ктулху! Він обідав твоїм агрегатом: -{delta} см! 🐙",
+    "Помилка 404: Пісюн частково не знайдено! -{delta} см! ❌",
 ]
 
 PISUN_PHRASES = {
@@ -217,3 +242,7 @@ def get_kyiv_now() -> datetime.datetime:
 def get_kyiv_today() -> datetime.date:
     """Returns current date in Kyiv timezone."""
     return get_kyiv_now().date()
+
+def is_same_week(date1: datetime.date, date2: datetime.date) -> bool:
+    """Checks if two dates belong to the same ISO week."""
+    return date1.isocalendar()[:2] == date2.isocalendar()[:2]
