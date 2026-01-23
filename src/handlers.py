@@ -6,6 +6,7 @@ from aiogram.types import Message, InlineKeyboardMarkup, InlineKeyboardButton, C
 from src.database import Database
 from src.utils import get_fair_pisun_delta, PISUN_PHRASES, PIHV_VARIANTS, INSERT_RESPONSES, TRAP_RESPONSES, get_kyiv_now, get_kyiv_today
 from src.scheduler import send_weekly_bonus
+from src.facts import FACTS
 from aiogram import Bot
 import random
 import os
@@ -53,10 +54,29 @@ async def cmd_pisun(message: Message):
             hours, remainder = divmod(int(remaining.total_seconds()), 3600)
             minutes, seconds = divmod(remainder, 60)
             
+            # --- Fact Logic ---
+            shown_indices = await db.get_shown_facts(user_id, chat_id)
+            available_indices = [i for i in range(len(FACTS)) if i not in shown_indices]
+            
+            if not available_indices:
+                # Reset if all shown
+                await db.clear_shown_facts(user_id, chat_id)
+                available_indices = list(range(len(FACTS)))
+            
+            if available_indices:
+                fact_idx = random.choice(available_indices)
+                fact_text = FACTS[fact_idx]
+                await db.add_shown_fact(user_id, chat_id, fact_idx)
+                
+                fact_block = f"\n\n🎓 **Цікавий факт:**\n{fact_text}"
+            else:
+                # Fallback just in case list is empty somehow
+                fact_block = ""
+            
             timer_text = f"\n\nСпробуйте знову через: **{hours} год. {minutes} хв. {seconds} сек.**"
             base_phrase = random.choice(PISUN_PHRASES["already_measured"])
             
-            await message.reply(base_phrase + timer_text, parse_mode="Markdown")
+            await message.reply(base_phrase + timer_text + fact_block, parse_mode="Markdown")
             return
     else:
         length, count, weekly_length, last_reset_week = 0.0, 0, 0.0, current_week

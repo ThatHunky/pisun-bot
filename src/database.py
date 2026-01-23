@@ -21,6 +21,15 @@ class Database:
                     PRIMARY KEY (user_id, chat_id)
                 )
             """)
+
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS user_facts (
+                    user_id INTEGER,
+                    chat_id INTEGER,
+                    fact_index INTEGER,
+                    PRIMARY KEY (user_id, chat_id, fact_index)
+                )
+            """)
             
             # Migration for existing databases
             try:
@@ -145,3 +154,28 @@ class Database:
             )
             await db.commit()
             return cursor.rowcount > 0
+
+    async def get_shown_facts(self, user_id: int, chat_id: int) -> List[int]:
+        async with aiosqlite.connect(self.db_path) as db:
+            async with db.execute(
+                "SELECT fact_index FROM user_facts WHERE user_id = ? AND chat_id = ?",
+                (user_id, chat_id)
+            ) as cursor:
+                rows = await cursor.fetchall()
+                return [row[0] for row in rows]
+
+    async def add_shown_fact(self, user_id: int, chat_id: int, fact_index: int):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "INSERT OR IGNORE INTO user_facts (user_id, chat_id, fact_index) VALUES (?, ?, ?)",
+                (user_id, chat_id, fact_index)
+            )
+            await db.commit()
+
+    async def clear_shown_facts(self, user_id: int, chat_id: int):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
+                "DELETE FROM user_facts WHERE user_id = ? AND chat_id = ?",
+                (user_id, chat_id)
+            )
+            await db.commit()
