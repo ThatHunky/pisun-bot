@@ -1,8 +1,63 @@
+import asyncio
+import logging
 import random
 import datetime
 from zoneinfo import ZoneInfo
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from aiogram import Bot
 
 KYIV_TZ = ZoneInfo("Europe/Kyiv")
+RETRY_MAX_ATTEMPTS = 3
+logger = logging.getLogger(__name__)
+
+
+async def _retry_on_429(coro):
+    """Run coroutine, on TelegramRetryAfter sleep and retry up to RETRY_MAX_ATTEMPTS."""
+    from aiogram.exceptions import TelegramRetryAfter
+    last_exc = None
+    for attempt in range(RETRY_MAX_ATTEMPTS):
+        try:
+            return await coro()
+        except TelegramRetryAfter as e:
+            last_exc = e
+            if attempt == RETRY_MAX_ATTEMPTS - 1:
+                raise
+            logger.warning("Telegram 429, retry after %s s (attempt %s)", e.retry_after, attempt + 1)
+            await asyncio.sleep(e.retry_after)
+    if last_exc:
+        raise last_exc
+
+
+async def send_message_with_retry(bot: "Bot", chat_id: int, text: str, **kwargs):
+    """Send message with retry on Telegram 429 (Too Many Requests)."""
+    async def _send():
+        return await bot.send_message(chat_id, text, **kwargs)
+    return await _retry_on_429(_send)
+
+
+async def edit_message_text_with_retry(bot: "Bot", **kwargs):
+    """Edit message text with retry on Telegram 429."""
+    async def _edit():
+        return await bot.edit_message_text(**kwargs)
+    return await _retry_on_429(_edit)
+
+
+class RetryBot:
+    """Wraps a Bot so send_message and edit_message_text retry on 429."""
+
+    def __init__(self, bot: "Bot"):
+        self._bot = bot
+
+    def __getattr__(self, name):
+        return getattr(self._bot, name)
+
+    async def send_message(self, chat_id: int, text: str, **kwargs):
+        return await send_message_with_retry(self._bot, chat_id, text, **kwargs)
+
+    async def edit_message_text(self, **kwargs):
+        return await edit_message_text_with_retry(self._bot, **kwargs)
 
 def get_fair_pisun_delta(measure_count: int, current_length: float) -> float:
     """
@@ -246,3 +301,45 @@ def get_kyiv_today() -> datetime.date:
 def is_same_week(date1: datetime.date, date2: datetime.date) -> bool:
     """Checks if two dates belong to the same ISO week."""
     return date1.isocalendar()[:2] == date2.isocalendar()[:2]
+
+
+EVENT_TYPES = ("duel", "jackpot", "trap")
+STAKE_TIERS = (5, 10, 20)
+EVENT_DURATIONS_SEC = {
+    "duel": 60,
+    "jackpot": 90,
+    "trap": 90,
+}
+EVENT_LABELS = {
+    "duel": "Дуель",
+    "jackpot": "Джекпот",
+    "trap": "Пастка",
+}
+HISTORY_SOURCE_LABELS = {
+    "pisun": "Щоденний замір",
+    "weekly_pihv": "Тижневий дроп",
+    "event_duel": "Подія: дуель",
+    "event_jackpot": "Подія: джекпот",
+    "event_trap": "Подія: пастка",
+}
+QUIET_HOURS_START = 1
+QUIET_HOURS_END = 7
+
+
+def get_utc_now() -> datetime.datetime:
+    return datetime.datetime.now(datetime.timezone.utc)
+
+
+def get_utc_now_iso() -> str:
+    return get_utc_now().isoformat(timespec="seconds")
+
+
+def parse_iso_datetime(value: str) -> datetime.datetime:
+    dt = datetime.datetime.fromisoformat(value)
+    if dt.tzinfo is None:
+        return dt.replace(tzinfo=datetime.timezone.utc)
+    return dt
+
+
+def to_kyiv_datetime(value: str) -> datetime.datetime:
+    return parse_iso_datetime(value).astimezone(KYIV_TZ)
